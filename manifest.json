@@ -3,7 +3,7 @@
 	"default_locale": "en",
 	"name": "__MSG_extName__",
 	"description": "__MSG_extDescription__",
-	"version": "6.2.0",
+	"version": "6.2.1",
 	"permissions": ["activeTab", "storage"],
 	"action": {
 		"default_popup": "popup.html"
@@ -40,7 +40,8 @@
 				"*://*.hulu.com/*",
 				"*://*.twitch.tv/*",
 				"*://*.rumble.com/*",
-				"*://*.facebook.com/*"
+				"*://*.facebook.com/*",
+				"*://*.tiktok.com/*"
 			],
 			"matches": ["<all_urls>"],
 			"js": ["showvideocontrolsbydefault.js"]

@@ -136,8 +136,10 @@ It does not replace a website's player or add a new playback engine.
 - **Custom players may not work.** Sites can use their own overlays or player logic
   that hides, replaces, or interferes with native controls.
 - **Some sites are excluded by design.** The manifest excludes several major video
-  services, including YouTube, Netflix, Vimeo, and Twitch. Adding one of those sites
-  to your allowed list does not override the manifest exclusions.
+  services, including YouTube, Netflix, Vimeo, Twitch, and TikTok. Adding one of those sites
+  to your allowed list does not override the manifest exclusions. TikTok is excluded
+  because its own control bar is drawn over the native one, so the native controls
+  could not be clicked.
 - **Protected browser pages cannot be modified** (such as `about:` pages in Firefox or
   `edge://` and `chrome://` pages in Chromium browsers). The site-list form also rejects
   local domains and IP addresses.
