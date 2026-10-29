@@ -227,6 +227,7 @@
 			Math.round(videoBox.top + videoBox.height / 2)
 		];
 		const videoArea = videoBox.width * videoBox.height;
+		const inDialog = dialogOpen();
 		for (const y of probes) {
 			// Hit-testing only works for points inside the visible window.
 			if (x < 0 || x >= window.innerWidth || y < 0 || y >= window.innerHeight) continue;
@@ -236,7 +237,12 @@
 				const layer = stack[i];
 				if (layer.contains(video)) continue; // Never disable a parent of the video.
 				// Narrow elements are controls (icons), not covers: leave them alone.
-				if (layer.getBoundingClientRect().width < videoBox.width * 0.9) continue;
+				const layerBox = layer.getBoundingClientRect();
+				if (layerBox.width < videoBox.width * 0.9) continue;
+				// Inside a dialog, only a layer that sits on the video is a cover. Larger
+				// ones (the dialog's own panels) are left alone: releasing them let hover
+				// and clicks pass through to the grid underneath.
+				if (inDialog && !sitsOnVideo(layerBox, videoBox)) continue;
 				layer.style.pointerEvents = 'none';
 				layer.setAttribute('data-igblock', 'true'); // Restored when disabled.
 				// Pointer-events is inherited, so give small interactive children
@@ -254,9 +260,17 @@
 	// True while a dialog is open on the page, such as a post shown as a popup over
 	// Explore. The dialog's own layers sit above the videos underneath, so changing
 	// them (pointer-events) would let hover and clicks reach the page below. While a
-	// dialog is open, the add-on leaves the page's layers alone.
+	// dialog is open, only covers that sit exactly on a video are released (see
+	// releaseVideoOverlays), and the page-wide overlay rule is skipped.
 	function dialogOpen() {
 		return document.querySelector('[role="dialog"]') !== null;
+	}
+
+	// True if a box lies on the video itself, within a few pixels: a cover.
+	function sitsOnVideo(box, videoBox) {
+		const tol = 4;
+		return box.left >= videoBox.left - tol && box.right <= videoBox.right + tol &&
+			box.top >= videoBox.top - tol && box.bottom <= videoBox.bottom + tol;
 	}
 
 	// Events Instagram uses to move between reels and posts (taps and clicks).
@@ -267,10 +281,9 @@
 	// browser's own control bar has handled the event (the bar lives inside the
 	// video), and stopPropagation does not cancel default actions. The native
 	// controls keep working; only the page's handlers stop seeing these clicks.
-	// Only while the add-on is active and no dialog is open: on Explore, when disabled
-	// and inside a popup, nothing changes.
+	// Only while the add-on is active: on Explore and when disabled, nothing changes.
 	function stopVideoClickBubbling(event) {
-		if (active && !dialogOpen()) event.stopPropagation();
+		if (active) event.stopPropagation();
 	}
 
 	// Attach the guard to one video. The same function reference is passed every
@@ -284,7 +297,6 @@
 	function liftInstagramAudioButtons() {
 		document.querySelectorAll('video[' + ADDED_MARK + ']').forEach(video => {
 			guardInstagramVideo(video);
-			if (dialogOpen()) return; // Leave the page's layers alone while a dialog is open.
 			const videoBox = video.getBoundingClientRect();
 			if (videoBox.width === 0 || videoBox.height === 0) return; // Not laid out.
 			releaseVideoOverlays(video, videoBox);
