@@ -139,7 +139,9 @@ It does not replace a website's player or add a new playback engine.
   services, including YouTube, Netflix, Vimeo, Twitch, and TikTok. Adding one of those sites
   to your allowed list does not override the manifest exclusions. TikTok is excluded
   because its own control bar is drawn over the native one, so the native controls
-  could not be clicked.
+  could not be clicked. The add-on also turns off on Instagram's Explore section
+  (`/explore`), because its video grid has to stay clickable, and turns back on when
+  you leave it.
 - **Protected browser pages cannot be modified** (such as `about:` pages in Firefox or
   `edge://` and `chrome://` pages in Chromium browsers). The site-list form also rejects
   local domains and IP addresses.

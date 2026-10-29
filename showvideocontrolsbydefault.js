@@ -27,6 +27,11 @@
 // - includedDomains: in include mode, the only sites where the add-on runs.
 // - blockAutoplay: true to pause videos that start without user interaction.
 //   Anything other than the boolean true (including a missing key) means off.
+//
+// Excluded pages inside a site: Instagram's Explore section (/explore) is
+// off, because its video grid must stay clickable. The script checks the path
+// on load and after in-app moves, which do not reload the page. It is handled
+// here, not in the manifest, so that leaving Explore brings the add-on back.
 
 (() => {
 	'use strict';
@@ -64,6 +69,9 @@
 	let syncCounter = 0; // Lets a newer settings read win over an older one.
 	let firstSync = true; // True until the first settings read has been applied.
 	let blockingAutoplay = false; // True only while the autoplay listeners are attached.
+	let allowedBySettings = false; // Stored settings allow this site (page path not yet checked).
+	let blockAutoplayWanted = false; // Stored blockAutoplay option, kept to re-apply on re-enable.
+	let lastPath = window.location.pathname; // Last path seen, to detect in-app navigation.
 
 	// ---------- Domain matching ----------
 
@@ -219,6 +227,7 @@
 			Math.round(videoBox.top + videoBox.height / 2)
 		];
 		const videoArea = videoBox.width * videoBox.height;
+		const inDialog = dialogOpen();
 		for (const y of probes) {
 			// Hit-testing only works for points inside the visible window.
 			if (x < 0 || x >= window.innerWidth || y < 0 || y >= window.innerHeight) continue;
@@ -228,7 +237,12 @@
 				const layer = stack[i];
 				if (layer.contains(video)) continue; // Never disable a parent of the video.
 				// Narrow elements are controls (icons), not covers: leave them alone.
-				if (layer.getBoundingClientRect().width < videoBox.width * 0.9) continue;
+				const layerBox = layer.getBoundingClientRect();
+				if (layerBox.width < videoBox.width * 0.9) continue;
+				// Inside a dialog, only a layer that sits on the video is a cover. Larger
+				// ones (the dialog's own panels) are left alone: releasing them let hover
+				// and clicks pass through to the grid underneath.
+				if (inDialog && !sitsOnVideo(layerBox, videoBox)) continue;
 				layer.style.pointerEvents = 'none';
 				layer.setAttribute('data-igblock', 'true'); // Restored when disabled.
 				// Pointer-events is inherited, so give small interactive children
@@ -243,8 +257,46 @@
 		}
 	}
 
+	// True while a dialog is open on the page, such as a post shown as a popup over
+	// Explore. The dialog's own layers sit above the videos underneath, so changing
+	// them (pointer-events) would let hover and clicks reach the page below. While a
+	// dialog is open, only covers that sit exactly on a video are released (see
+	// releaseVideoOverlays), and the page-wide overlay rule is skipped.
+	function dialogOpen() {
+		return document.querySelector('[role="dialog"]') !== null;
+	}
+
+	// True if a box lies on the video itself, within a few pixels: a cover.
+	function sitsOnVideo(box, videoBox) {
+		const tol = 4;
+		return box.left >= videoBox.left - tol && box.right <= videoBox.right + tol &&
+			box.top >= videoBox.top - tol && box.bottom <= videoBox.bottom + tol;
+	}
+
+	// Events Instagram uses to move between reels and posts (taps and clicks).
+	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'touchend'];
+
+	// Stops a click on a video from reaching Instagram, whose handlers treat it as
+	// "next reel". This listener sits on the <video> itself, so it runs AFTER the
+	// browser's own control bar has handled the event (the bar lives inside the
+	// video), and stopPropagation does not cancel default actions. The native
+	// controls keep working; only the page's handlers stop seeing these clicks.
+	// Only while the add-on is active: on Explore and when disabled, nothing changes.
+	function stopVideoClickBubbling(event) {
+		if (active) event.stopPropagation();
+	}
+
+	// Attach the guard to one video. The same function reference is passed every
+	// time, so the browser keeps a single listener per event and video.
+	function guardInstagramVideo(video) {
+		for (const type of VIDEO_CLICK_EVENTS) {
+			video.addEventListener(type, stopVideoClickBubbling);
+		}
+	}
+
 	function liftInstagramAudioButtons() {
 		document.querySelectorAll('video[' + ADDED_MARK + ']').forEach(video => {
+			guardInstagramVideo(video);
 			const videoBox = video.getBoundingClientRect();
 			if (videoBox.width === 0 || videoBox.height === 0) return; // Not laid out.
 			releaseVideoOverlays(video, videoBox);
@@ -320,7 +372,7 @@
 				removeOverlays9gag();
 			}
 			if (isInstagram) {
-				removeOverlaysInstagram();
+				if (!dialogOpen()) removeOverlaysInstagram();
 				liftInstagramAudioButtons();
 			}
 		} catch (error) {
@@ -403,6 +455,17 @@
 		} else {
 			stopBlockingAutoplay();
 		}
+	}
+
+	// ---------- Excluded pages inside a site ----------
+
+	// Instagram's Explore section: /explore and everything under it, but not a
+	// path that merely starts with the same letters (such as /explorer).
+	const EXPLORE_PATH = /^\/explore(\/|$)/;
+
+	// True when the add-on must stay off on the current page, whatever the settings say.
+	function isOnExcludedPage() {
+		return isInstagram && EXPLORE_PATH.test(window.location.pathname);
 	}
 
 	// ---------- DOM observation ----------
@@ -491,25 +554,44 @@
 
 	// ---------- Settings ----------
 
-	// One storage read per call; the result drives enable()/disable().
+	// The single place that decides whether the add-on runs on this page. It uses
+	// the cached settings only, so it is cheap to call on every page move.
+	function applyDesiredState() {
+		if (allowedBySettings && !isOnExcludedPage()) {
+			enable();
+			// Re-applied each time: leaving an excluded page turns the autoplay
+			// listeners off, and coming back must restore them.
+			setAutoplayBlocking(blockAutoplayWanted);
+		} else {
+			disable();
+		}
+	}
+
+	// One storage read per call; the result is cached and then applied.
 	async function syncWithSettings() {
 		const myRun = ++syncCounter;
 		try {
 			const data = await api.storage.local.get(SETTINGS_KEYS);
 			// A newer change arrived while this read was pending: let it decide.
 			if (myRun !== syncCounter) return;
-			if (isEnabledFor(data)) {
-				enable();
-				// Strict boolean check: storage is untrusted input.
-				setAutoplayBlocking(data.blockAutoplay === true);
-			} else {
-				disable();
-			}
-			firstSync = false; // Later reads come from popup changes, not page loads.
+			allowedBySettings = isEnabledFor(data);
+			// Strict boolean check: storage is untrusted input.
+			blockAutoplayWanted = data.blockAutoplay === true;
 		} catch (error) {
 			// If settings cannot be read, do nothing rather than guess.
-			disable();
+			allowedBySettings = false;
 		}
+		applyDesiredState();
+		firstSync = false; // Later reads come from popup changes, not page loads.
+	}
+
+	// Runs after every move inside the app (Instagram is a single-page app). Only
+	// the path is compared, so most calls end here without any other work.
+	function onPossibleNavigation() {
+		const path = window.location.pathname;
+		if (path === lastPath) return;
+		lastPath = path;
+		applyDesiredState();
 	}
 
 	// Re-evaluate only when one of OUR keys changes in local storage. This lets
@@ -519,6 +601,19 @@
 			syncWithSettings();
 		}
 	});
+
+	// In-app navigation hooks, Instagram only (the one site with an excluded section).
+	// The Navigation API reports every same-document move, including history.pushState
+	// calls made by the page itself. Browsers without it get a fallback: the page
+	// changes the URL while handling a click, so the path is checked after the click.
+	if (isInstagram) {
+		window.addEventListener('popstate', onPossibleNavigation);
+		if (window.navigation) {
+			window.navigation.addEventListener('navigatesuccess', onPossibleNavigation);
+		} else {
+			document.addEventListener('click', () => requestAnimationFrame(onPossibleNavigation), true);
+		}
+	}
 
 	syncWithSettings();
 })();

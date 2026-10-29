@@ -3,7 +3,7 @@
 	"default_locale": "en",
 	"name": "__MSG_extName__",
 	"description": "__MSG_extDescription__",
-	"version": "6.2.1",
+	"version": "6.2.2",
 	"permissions": ["activeTab", "storage"],
 	"action": {
 		"default_popup": "popup.html"

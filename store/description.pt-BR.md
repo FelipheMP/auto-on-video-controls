@@ -29,7 +29,7 @@ TAMBÉM INCLUÍDO
 
 BOM SABER
 • Alguns sites usam players próprios que escondem ou substituem os controles nativos. A extensão não consegue ajudar nesses casos.
-• Ela fica desligada de propósito no YouTube, Netflix, Vimeo, Dailymotion, Hulu, Twitch, Rumble, Facebook e TikTok.
+• Ela fica desligada de propósito no YouTube, Netflix, Vimeo, Dailymotion, Hulu, Twitch, Rumble, Facebook e TikTok, e na página Explorar do Instagram.
 • Os navegadores não permitem extensões nas próprias páginas internas nem nas lojas de extensões.
 
 Encontrou um site em que não funciona? Abra uma issue com o endereço da página e a versão do seu navegador: https://github.com/FelipheMP/auto-on-video-controls/issues
