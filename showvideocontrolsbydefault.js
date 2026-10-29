@@ -251,8 +251,30 @@
 		}
 	}
 
+	// Events Instagram uses to move between reels and posts (taps and clicks).
+	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'touchend'];
+
+	// Stops a click on a video from reaching Instagram, whose handlers treat it as
+	// "next reel". This listener sits on the <video> itself, so it runs AFTER the
+	// browser's own control bar has handled the event (the bar lives inside the
+	// video), and stopPropagation does not cancel default actions. The native
+	// controls keep working; only the page's handlers stop seeing these clicks.
+	// Only while the add-on is active: on Explore and when disabled, nothing changes.
+	function stopVideoClickBubbling(event) {
+		if (active) event.stopPropagation();
+	}
+
+	// Attach the guard to one video. The same function reference is passed every
+	// time, so the browser keeps a single listener per event and video.
+	function guardInstagramVideo(video) {
+		for (const type of VIDEO_CLICK_EVENTS) {
+			video.addEventListener(type, stopVideoClickBubbling);
+		}
+	}
+
 	function liftInstagramAudioButtons() {
 		document.querySelectorAll('video[' + ADDED_MARK + ']').forEach(video => {
+			guardInstagramVideo(video);
 			const videoBox = video.getBoundingClientRect();
 			if (videoBox.width === 0 || videoBox.height === 0) return; // Not laid out.
 			releaseVideoOverlays(video, videoBox);
