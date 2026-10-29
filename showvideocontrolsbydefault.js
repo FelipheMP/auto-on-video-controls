@@ -251,6 +251,14 @@
 		}
 	}
 
+	// True while a dialog is open on the page, such as a post shown as a popup over
+	// Explore. The dialog's own layers sit above the videos underneath, so changing
+	// them (pointer-events) would let hover and clicks reach the page below. While a
+	// dialog is open, the add-on leaves the page's layers alone.
+	function dialogOpen() {
+		return document.querySelector('[role="dialog"]') !== null;
+	}
+
 	// Events Instagram uses to move between reels and posts (taps and clicks).
 	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'touchend'];
 
@@ -259,9 +267,10 @@
 	// browser's own control bar has handled the event (the bar lives inside the
 	// video), and stopPropagation does not cancel default actions. The native
 	// controls keep working; only the page's handlers stop seeing these clicks.
-	// Only while the add-on is active: on Explore and when disabled, nothing changes.
+	// Only while the add-on is active and no dialog is open: on Explore, when disabled
+	// and inside a popup, nothing changes.
 	function stopVideoClickBubbling(event) {
-		if (active) event.stopPropagation();
+		if (active && !dialogOpen()) event.stopPropagation();
 	}
 
 	// Attach the guard to one video. The same function reference is passed every
@@ -275,6 +284,7 @@
 	function liftInstagramAudioButtons() {
 		document.querySelectorAll('video[' + ADDED_MARK + ']').forEach(video => {
 			guardInstagramVideo(video);
+			if (dialogOpen()) return; // Leave the page's layers alone while a dialog is open.
 			const videoBox = video.getBoundingClientRect();
 			if (videoBox.width === 0 || videoBox.height === 0) return; // Not laid out.
 			releaseVideoOverlays(video, videoBox);
@@ -350,7 +360,7 @@
 				removeOverlays9gag();
 			}
 			if (isInstagram) {
-				removeOverlaysInstagram();
+				if (!dialogOpen()) removeOverlaysInstagram();
 				liftInstagramAudioButtons();
 			}
 		} catch (error) {
