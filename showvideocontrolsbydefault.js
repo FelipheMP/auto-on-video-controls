@@ -27,6 +27,10 @@
 // - includedDomains: in include mode, the only sites where the add-on runs.
 // - blockAutoplay: true to pause videos that start without user interaction.
 //   Anything other than the boolean true (including a missing key) means off.
+//
+// Excluded pages inside a site: Instagram's Explore section (/explore) is
+// off, because its video grid must stay clickable. The manifest covers direct
+// visits; the script covers in-app moves, which do not reload the page.
 
 (() => {
 	'use strict';
@@ -64,6 +68,9 @@
 	let syncCounter = 0; // Lets a newer settings read win over an older one.
 	let firstSync = true; // True until the first settings read has been applied.
 	let blockingAutoplay = false; // True only while the autoplay listeners are attached.
+	let allowedBySettings = false; // Stored settings allow this site (page path not yet checked).
+	let blockAutoplayWanted = false; // Stored blockAutoplay option, kept to re-apply on re-enable.
+	let lastPath = window.location.pathname; // Last path seen, to detect in-app navigation.
 
 	// ---------- Domain matching ----------
 
@@ -405,6 +412,17 @@
 		}
 	}
 
+	// ---------- Excluded pages inside a site ----------
+
+	// Instagram's Explore section: /explore and everything under it, but not a
+	// path that merely starts with the same letters (such as /explorer).
+	const EXPLORE_PATH = /^\/explore(\/|$)/;
+
+	// True when the add-on must stay off on the current page, whatever the settings say.
+	function isOnExcludedPage() {
+		return isInstagram && EXPLORE_PATH.test(window.location.pathname);
+	}
+
 	// ---------- DOM observation ----------
 
 	// Process everything collected since the last frame in a single pass.
@@ -491,25 +509,44 @@
 
 	// ---------- Settings ----------
 
-	// One storage read per call; the result drives enable()/disable().
+	// The single place that decides whether the add-on runs on this page. It uses
+	// the cached settings only, so it is cheap to call on every page move.
+	function applyDesiredState() {
+		if (allowedBySettings && !isOnExcludedPage()) {
+			enable();
+			// Re-applied each time: leaving an excluded page turns the autoplay
+			// listeners off, and coming back must restore them.
+			setAutoplayBlocking(blockAutoplayWanted);
+		} else {
+			disable();
+		}
+	}
+
+	// One storage read per call; the result is cached and then applied.
 	async function syncWithSettings() {
 		const myRun = ++syncCounter;
 		try {
 			const data = await api.storage.local.get(SETTINGS_KEYS);
 			// A newer change arrived while this read was pending: let it decide.
 			if (myRun !== syncCounter) return;
-			if (isEnabledFor(data)) {
-				enable();
-				// Strict boolean check: storage is untrusted input.
-				setAutoplayBlocking(data.blockAutoplay === true);
-			} else {
-				disable();
-			}
-			firstSync = false; // Later reads come from popup changes, not page loads.
+			allowedBySettings = isEnabledFor(data);
+			// Strict boolean check: storage is untrusted input.
+			blockAutoplayWanted = data.blockAutoplay === true;
 		} catch (error) {
 			// If settings cannot be read, do nothing rather than guess.
-			disable();
+			allowedBySettings = false;
 		}
+		applyDesiredState();
+		firstSync = false; // Later reads come from popup changes, not page loads.
+	}
+
+	// Runs after every move inside the app (Instagram is a single-page app). Only
+	// the path is compared, so most calls end here without any other work.
+	function onPossibleNavigation() {
+		const path = window.location.pathname;
+		if (path === lastPath) return;
+		lastPath = path;
+		applyDesiredState();
 	}
 
 	// Re-evaluate only when one of OUR keys changes in local storage. This lets
@@ -519,6 +556,19 @@
 			syncWithSettings();
 		}
 	});
+
+	// In-app navigation hooks, Instagram only (the one site with an excluded section).
+	// The Navigation API reports every same-document move, including history.pushState
+	// calls made by the page itself. Browsers without it get a fallback: the page
+	// changes the URL while handling a click, so the path is checked after the click.
+	if (isInstagram) {
+		window.addEventListener('popstate', onPossibleNavigation);
+		if (window.navigation) {
+			window.navigation.addEventListener('navigatesuccess', onPossibleNavigation);
+		} else {
+			document.addEventListener('click', () => requestAnimationFrame(onPossibleNavigation), true);
+		}
+	}
 
 	syncWithSettings();
 })();
