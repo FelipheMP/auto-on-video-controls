@@ -29,7 +29,7 @@ ALSO INCLUDED
 
 GOOD TO KNOW
 • Some sites use custom players that hide or replace the native controls. The extension cannot help there.
-• It is off by design on YouTube, Netflix, Vimeo, Dailymotion, Hulu, Twitch, Rumble, Facebook, TikTok and Instagram's Explore page.
+• It is off by design on YouTube, Netflix, Vimeo, Dailymotion, Hulu, Twitch, Rumble, Facebook and TikTok, and on Instagram's Explore page.
 • Browsers do not allow extensions on their own internal pages or on extension stores.
 
 Found a site where it does not work? Open an issue with the page address and your browser version: https://github.com/FelipheMP/auto-on-video-controls/issues

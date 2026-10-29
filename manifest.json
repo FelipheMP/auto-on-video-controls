@@ -41,9 +41,7 @@
 				"*://*.twitch.tv/*",
 				"*://*.rumble.com/*",
 				"*://*.facebook.com/*",
-				"*://*.tiktok.com/*",
-				"*://*.instagram.com/explore",
-				"*://*.instagram.com/explore/*"
+				"*://*.tiktok.com/*"
 			],
 			"matches": ["<all_urls>"],
 			"js": ["showvideocontrolsbydefault.js"]

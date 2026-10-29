@@ -29,8 +29,9 @@
 //   Anything other than the boolean true (including a missing key) means off.
 //
 // Excluded pages inside a site: Instagram's Explore section (/explore) is
-// off, because its video grid must stay clickable. The manifest covers direct
-// visits; the script covers in-app moves, which do not reload the page.
+// off, because its video grid must stay clickable. The script checks the path
+// on load and after in-app moves, which do not reload the page. It is handled
+// here, not in the manifest, so that leaving Explore brings the add-on back.
 
 (() => {
 	'use strict';
