@@ -334,13 +334,12 @@
 		video.addEventListener('touchend', stopTouchTapEnd);
 	}
 
-	function liftInstagramAudioButtons(buttonsToo = true) {
+	function liftInstagramAudioButtons() {
 		document.querySelectorAll('video[' + ADDED_MARK + ']').forEach(video => {
 			guardInstagramVideo(video);
 			const videoBox = video.getBoundingClientRect();
 			if (videoBox.width === 0 || videoBox.height === 0) return; // Not laid out.
 			releaseVideoOverlays(video, videoBox);
-			if (!buttonsToo) return; // Touch reels: covers only, buttons left as the page has them.
 
 			// Search area: the feed post, or the main content on pages without
 			// <article> (single reels). The position test below keeps only buttons
@@ -406,15 +405,6 @@
 	// These fixes depend on third-party page markup, which changes without
 	// notice. A failure here must never switch off the core feature (the video
 	// controls), so errors are contained and the page is left as it is.
-	// On touch devices, Instagram's reels page (/reels/ or /reel/) broke when the
-	// add-on moved its buttons: the layout shifted and only the bottom bar responded.
-	// There, only the cover release is kept, so the controls can show. Desktop is unchanged.
-	const REELS_PATH = /^\/reels?(\/|$)/;
-	function isTouchReels() {
-		return REELS_PATH.test(window.location.pathname) &&
-			window.matchMedia('(pointer: coarse)').matches;
-	}
-
 	function applySiteFixes() {
 		if (!active) return;
 		try {
@@ -422,12 +412,8 @@
 				removeOverlays9gag();
 			}
 			if (isInstagram) {
-				if (isTouchReels()) {
-					liftInstagramAudioButtons(false);
-				} else {
-					if (!dialogOpen()) removeOverlaysInstagram();
-					liftInstagramAudioButtons(true);
-				}
+				if (!dialogOpen()) removeOverlaysInstagram();
+				liftInstagramAudioButtons();
 			}
 		} catch (error) {
 			// Intentionally ignored: see the comment above.
