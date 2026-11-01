@@ -334,12 +334,13 @@
 		video.addEventListener('touchend', stopTouchTapEnd);
 	}
 
-	function liftInstagramAudioButtons() {
+	function liftInstagramAudioButtons(buttonsToo = true) {
 		document.querySelectorAll('video[' + ADDED_MARK + ']').forEach(video => {
 			guardInstagramVideo(video);
 			const videoBox = video.getBoundingClientRect();
 			if (videoBox.width === 0 || videoBox.height === 0) return; // Not laid out.
 			releaseVideoOverlays(video, videoBox);
+			if (!buttonsToo) return; // Touch reels: covers only, buttons left as the page has them.
 
 			// Search area: the feed post, or the main content on pages without
 			// <article> (single reels). The position test below keeps only buttons
@@ -405,12 +406,11 @@
 	// These fixes depend on third-party page markup, which changes without
 	// notice. A failure here must never switch off the core feature (the video
 	// controls), so errors are contained and the page is left as it is.
-	// On touch devices, Instagram's reels page (/reels/ or /reel/) breaks when the
-	// add-on changes its layers and buttons: the layout shifts, and touches reach
-	// only the bottom bar. Desktop is unchanged. The native controls do not need
-	// these fixes on reels, so they are skipped there.
+	// On touch devices, Instagram's reels page (/reels/ or /reel/) broke when the
+	// add-on moved its buttons: the layout shifted and only the bottom bar responded.
+	// There, only the cover release is kept, so the controls can show. Desktop is unchanged.
 	const REELS_PATH = /^\/reels?(\/|$)/;
-	function skipInstagramFixesHere() {
+	function isTouchReels() {
 		return REELS_PATH.test(window.location.pathname) &&
 			window.matchMedia('(pointer: coarse)').matches;
 	}
@@ -421,9 +421,13 @@
 			if (isNineGag) {
 				removeOverlays9gag();
 			}
-			if (isInstagram && !skipInstagramFixesHere()) {
-				if (!dialogOpen()) removeOverlaysInstagram();
-				liftInstagramAudioButtons();
+			if (isInstagram) {
+				if (isTouchReels()) {
+					liftInstagramAudioButtons(false);
+				} else {
+					if (!dialogOpen()) removeOverlaysInstagram();
+					liftInstagramAudioButtons(true);
+				}
 			}
 		} catch (error) {
 			// Intentionally ignored: see the comment above.
