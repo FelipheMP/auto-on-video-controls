@@ -277,8 +277,10 @@
 			box.top >= videoBox.top - tol && box.bottom <= videoBox.bottom + tol;
 	}
 
-	// Events Instagram uses to move between reels and posts (taps and clicks).
-	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'touchend'];
+	// Events Instagram uses to move between reels and posts (mouse presses and clicks).
+	// Touch events are not listed: a swipe to the next reel starts and ends with them,
+	// and stopping them breaks swiping on mobile.
+	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
 
 	// Stops a click on a video from reaching Instagram, whose handlers treat it as
 	// "next reel". This listener sits on the <video> itself, so it runs AFTER the
@@ -287,7 +289,11 @@
 	// controls keep working; only the page's handlers stop seeing these clicks.
 	// Only while the add-on is active: on Explore and when disabled, nothing changes.
 	function stopVideoClickBubbling(event) {
-		if (active) event.stopPropagation();
+		if (!active) return;
+		// Pointer events from touch are left alone, so swipes keep working. Mouse-made
+		// events (no pointerType, or pointerType "mouse") are stopped as before.
+		if (event.pointerType && event.pointerType !== 'mouse') return;
+		event.stopPropagation();
 	}
 
 	// Attach the guard to one video. The same function reference is passed every
