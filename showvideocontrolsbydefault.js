@@ -502,10 +502,17 @@
 	// Instagram's Explore section: /explore and everything under it, but not a
 	// path that merely starts with the same letters (such as /explorer).
 	const EXPLORE_PATH = /^\/explore(\/|$)/;
+	// Instagram's reels page: /reels/ and /reel/.
+	const REELS_PATH = /^\/reels?(\/|$)/;
 
 	// True when the add-on must stay off on the current page, whatever the settings say.
+	// Reels are excluded on touch devices only: the add-on changes the reels layout
+	// there, and the native controls cannot be shown without that change.
 	function isOnExcludedPage() {
-		return isInstagram && EXPLORE_PATH.test(window.location.pathname);
+		if (!isInstagram) return false;
+		const path = window.location.pathname;
+		if (EXPLORE_PATH.test(path)) return true;
+		return REELS_PATH.test(path) && window.matchMedia('(pointer: coarse)').matches;
 	}
 
 	// ---------- DOM observation ----------
