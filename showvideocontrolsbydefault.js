@@ -239,6 +239,10 @@
 				// Narrow elements are controls (icons), not covers: leave them alone.
 				const layerBox = layer.getBoundingClientRect();
 				if (layerBox.width < videoBox.width * 0.9) continue;
+				// A cover is about the size of the video. Layers much larger than it are
+				// wrappers of the page or popup (for example, full-window bands). Releasing
+				// them lets hover and clicks pass through to the content underneath.
+				if (layerBox.width > videoBox.width * 1.5 || layerBox.height > videoBox.height * 1.5) continue;
 				// Inside a dialog, only a layer that sits on the video is a cover. Larger
 				// ones (the dialog's own panels) are left alone: releasing them let hover
 				// and clicks pass through to the grid underneath.
