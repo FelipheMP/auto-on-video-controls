@@ -405,13 +405,23 @@
 	// These fixes depend on third-party page markup, which changes without
 	// notice. A failure here must never switch off the core feature (the video
 	// controls), so errors are contained and the page is left as it is.
+	// On touch devices, Instagram's reels page (/reels/ or /reel/) breaks when the
+	// add-on changes its layers and buttons: the layout shifts, and touches reach
+	// only the bottom bar. Desktop is unchanged. The native controls do not need
+	// these fixes on reels, so they are skipped there.
+	const REELS_PATH = /^\/reels?(\/|$)/;
+	function skipInstagramFixesHere() {
+		return REELS_PATH.test(window.location.pathname) &&
+			window.matchMedia('(pointer: coarse)').matches;
+	}
+
 	function applySiteFixes() {
 		if (!active) return;
 		try {
 			if (isNineGag) {
 				removeOverlays9gag();
 			}
-			if (isInstagram) {
+			if (isInstagram && !skipInstagramFixesHere()) {
 				if (!dialogOpen()) removeOverlaysInstagram();
 				liftInstagramAudioButtons();
 			}
