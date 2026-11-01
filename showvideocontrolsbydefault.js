@@ -296,12 +296,42 @@
 		event.stopPropagation();
 	}
 
+	// Touch taps versus swipes. A swipe to the next reel moves the finger; a tap does
+	// not. Only the end of a tap (no movement) is stopped, so swipes are never touched.
+	let touchStartX = 0;
+	let touchStartY = 0;
+	let touchMoved = false;
+
+	function trackTouchStart(event) {
+		const touch = event.touches[0];
+		if (!touch) return;
+		touchStartX = touch.clientX;
+		touchStartY = touch.clientY;
+		touchMoved = false;
+	}
+
+	function trackTouchMove(event) {
+		const touch = event.touches[0];
+		if (!touch) return;
+		if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
+			touchMoved = true;
+		}
+	}
+
+	function stopTouchTapEnd(event) {
+		if (active && !touchMoved) event.stopPropagation();
+	}
+
 	// Attach the guard to one video. The same function reference is passed every
 	// time, so the browser keeps a single listener per event and video.
 	function guardInstagramVideo(video) {
 		for (const type of VIDEO_CLICK_EVENTS) {
 			video.addEventListener(type, stopVideoClickBubbling);
 		}
+		// Passive: these listeners never block scrolling or swiping.
+		video.addEventListener('touchstart', trackTouchStart, { passive: true });
+		video.addEventListener('touchmove', trackTouchMove, { passive: true });
+		video.addEventListener('touchend', stopTouchTapEnd);
 	}
 
 	function liftInstagramAudioButtons() {
