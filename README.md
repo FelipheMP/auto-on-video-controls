@@ -141,7 +141,8 @@ It does not replace a website's player or add a new playback engine.
   because its own control bar is drawn over the native one, so the native controls
   could not be clicked. The add-on also turns off on Instagram's Explore section
   (`/explore`), because its video grid has to stay clickable, and turns back on when
-  you leave it.
+  you leave it. On phones and tablets it is also off on Instagram reels (`/reels/`),
+  where the native controls cannot be shown without changing the reels layout.
 - **Protected browser pages cannot be modified** (such as `about:` pages in Firefox or
   `edge://` and `chrome://` pages in Chromium browsers). The site-list form also rejects
   local domains and IP addresses.

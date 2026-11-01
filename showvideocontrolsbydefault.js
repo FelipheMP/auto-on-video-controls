@@ -239,6 +239,10 @@
 				// Narrow elements are controls (icons), not covers: leave them alone.
 				const layerBox = layer.getBoundingClientRect();
 				if (layerBox.width < videoBox.width * 0.9) continue;
+				// A cover is about the size of the video. Layers much larger than it are
+				// wrappers of the page or popup (for example, full-window bands). Releasing
+				// them lets hover and clicks pass through to the content underneath.
+				if (layerBox.width > videoBox.width * 1.5 || layerBox.height > videoBox.height * 1.5) continue;
 				// Inside a dialog, only a layer that sits on the video is a cover. Larger
 				// ones (the dialog's own panels) are left alone: releasing them let hover
 				// and clicks pass through to the grid underneath.
@@ -273,8 +277,10 @@
 			box.top >= videoBox.top - tol && box.bottom <= videoBox.bottom + tol;
 	}
 
-	// Events Instagram uses to move between reels and posts (taps and clicks).
-	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'touchend'];
+	// Events Instagram uses to move between reels and posts (mouse presses and clicks).
+	// Touch events are not listed: a swipe to the next reel starts and ends with them,
+	// and stopping them breaks swiping on mobile.
+	const VIDEO_CLICK_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
 
 	// Stops a click on a video from reaching Instagram, whose handlers treat it as
 	// "next reel". This listener sits on the <video> itself, so it runs AFTER the
@@ -283,7 +289,37 @@
 	// controls keep working; only the page's handlers stop seeing these clicks.
 	// Only while the add-on is active: on Explore and when disabled, nothing changes.
 	function stopVideoClickBubbling(event) {
-		if (active) event.stopPropagation();
+		if (!active) return;
+		// Pointer events from touch are left alone, so swipes keep working. Mouse-made
+		// events (no pointerType, or pointerType "mouse") are stopped as before.
+		if (event.pointerType && event.pointerType !== 'mouse') return;
+		event.stopPropagation();
+	}
+
+	// Touch taps versus swipes. A swipe to the next reel moves the finger; a tap does
+	// not. Only the end of a tap (no movement) is stopped, so swipes are never touched.
+	let touchStartX = 0;
+	let touchStartY = 0;
+	let touchMoved = false;
+
+	function trackTouchStart(event) {
+		const touch = event.touches[0];
+		if (!touch) return;
+		touchStartX = touch.clientX;
+		touchStartY = touch.clientY;
+		touchMoved = false;
+	}
+
+	function trackTouchMove(event) {
+		const touch = event.touches[0];
+		if (!touch) return;
+		if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
+			touchMoved = true;
+		}
+	}
+
+	function stopTouchTapEnd(event) {
+		if (active && !touchMoved) event.stopPropagation();
 	}
 
 	// Attach the guard to one video. The same function reference is passed every
@@ -292,6 +328,10 @@
 		for (const type of VIDEO_CLICK_EVENTS) {
 			video.addEventListener(type, stopVideoClickBubbling);
 		}
+		// Passive: these listeners never block scrolling or swiping.
+		video.addEventListener('touchstart', trackTouchStart, { passive: true });
+		video.addEventListener('touchmove', trackTouchMove, { passive: true });
+		video.addEventListener('touchend', stopTouchTapEnd);
 	}
 
 	function liftInstagramAudioButtons() {
@@ -462,10 +502,17 @@
 	// Instagram's Explore section: /explore and everything under it, but not a
 	// path that merely starts with the same letters (such as /explorer).
 	const EXPLORE_PATH = /^\/explore(\/|$)/;
+	// Instagram's reels page: /reels/ and /reel/.
+	const REELS_PATH = /^\/reels?(\/|$)/;
 
 	// True when the add-on must stay off on the current page, whatever the settings say.
+	// Reels are excluded on touch devices only: the add-on changes the reels layout
+	// there, and the native controls cannot be shown without that change.
 	function isOnExcludedPage() {
-		return isInstagram && EXPLORE_PATH.test(window.location.pathname);
+		if (!isInstagram) return false;
+		const path = window.location.pathname;
+		if (EXPLORE_PATH.test(path)) return true;
+		return REELS_PATH.test(path) && window.matchMedia('(pointer: coarse)').matches;
 	}
 
 	// ---------- DOM observation ----------
